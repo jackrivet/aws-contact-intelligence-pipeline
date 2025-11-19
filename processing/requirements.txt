@@ -1,8 +1,0 @@
-boto3
-pandas
-torch
-transformers
-tqdm
-pyathena
-pyarrow
-s3fs
