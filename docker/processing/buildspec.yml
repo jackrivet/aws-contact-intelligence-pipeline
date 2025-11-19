@@ -1,0 +1,31 @@
+version: 0.2
+env:
+  variables:
+    IMAGE_REPO_NAME: "aws-contact-intelligence-processing"
+    IMAGE_TAG: "latest"
+
+phases:
+  pre_build:
+    commands:
+      - echo "Resolving AWS account and region..."
+      - ACCOUNT_ID=${ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+      - ECR_URI="$ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+      - echo "Logging in to Amazon ECR at $ECR_URI"
+      - aws --version
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin "$ECR_URI"
+  build:
+    commands:
+      - echo "Building Docker image..."
+      - docker build -t "$IMAGE_REPO_NAME:$IMAGE_TAG" -f docker/processing/Dockerfile .
+      - echo "Tagging image for ECR..."
+      - docker tag "$IMAGE_REPO_NAME:$IMAGE_TAG" "$ECR_URI/$IMAGE_REPO_NAME:$IMAGE_TAG"
+  post_build:
+    commands:
+      - echo "Pushing image to ECR..."
+      - docker push "$ECR_URI/$IMAGE_REPO_NAME:$IMAGE_TAG"
+      - echo "Writing imageDetail.json artifact..."
+      - printf '{"ImageURI":"%s"}' "$ECR_URI/$IMAGE_REPO_NAME:$IMAGE_TAG" > imageDetail.json
+artifacts:
+  files:
+    - imageDetail.json
